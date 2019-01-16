@@ -11,14 +11,7 @@ namespace sdsetup_backend
 {
     public class Program
     {
-
         public static Dictionary<string, string> Manifests;
-
-        private static string ip;
-        private static int httpPort;
-        private static int httpsPort;
-        private static string httpsCertLocation;
-        private static string httpsCertKey;
 
         public static string Temp;
         public static string Files;
@@ -49,17 +42,7 @@ namespace sdsetup_backend
 
         public static void Main(string[] args)
         {
-
             ReloadEverything();
-
-            string[] hostConf = File.ReadAllLines(Config + "/host.txt");
-            ip = hostConf[0];
-            httpPort = Convert.ToInt32(hostConf[1]);
-            httpsPort = Convert.ToInt32(hostConf[2]);
-
-            string[] certInfo = File.ReadAllLines(Config + "/https.txt");
-            httpsCertLocation = certInfo[0];
-            httpsCertKey = certInfo[1];
 
             privelegedUUID = Guid.NewGuid().ToString().Replace("-", "").ToLower();
 
@@ -69,13 +52,9 @@ namespace sdsetup_backend
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-                .UseKestrel(options =>
+                .UseKestrel((context, options) =>
                 {
-                    options.Listen(IPAddress.Parse(ip), httpPort);
-                    options.Listen(IPAddress.Parse(ip), httpsPort, listenOptions =>
-                    {
-                        listenOptions.UseHttps(httpsCertLocation, httpsCertKey);
-                    });
+                    options.Configure(context.Configuration.GetSection("Kestrel"));
                 })
                 .UseStartup<Startup>();
 
