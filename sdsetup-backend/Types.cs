@@ -2,20 +2,18 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Newtonsoft.Json;
 
-namespace sdsetup_backend {
+namespace sdsetup_backend
+{
 
-    public class Message {
+    public class Message
+    {
         public string Color = "info";
         public string InnerHTML = "Welcome to Homebrew SD Setup!";
 
-        public Message(string color, string innerHTML) {
+        public Message(string color, string innerHTML)
+        {
             Color = color;
             InnerHTML = innerHTML;
         }
@@ -23,57 +21,67 @@ namespace sdsetup_backend {
         public Message() { }
     }
 
-    public class Bundle {
+    public class Bundle
+    {
         public string Name;
         public string Description;
         public List<string> Packages;
 
-        public Bundle(string name, string description, List<string> packages) {
+        public Bundle(string name, string description, List<string> packages)
+        {
             Name = name;
             Description = description;
             this.Packages = packages;
         }
 
-        public Bundle() {
+        public Bundle()
+        {
 
         }
     }
 
-    public class Warning {
+    public class Warning
+    {
         public string Title;
         public string Content;
         public string PackageID;
 
-        public Warning(string title, string content, string packageId) {
+        public Warning(string title, string content, string packageId)
+        {
             this.Title = title;
             this.Content = content;
             this.PackageID = packageId;
         }
 
-        public Warning() {
+        public Warning()
+        {
 
         }
     }
 
-    public class Manifest {
+    public class Manifest
+    {
         public string Version = "";
         public string Copyright = "";
         public Message Message = new Message();
         public Dictionary<string, Platform> Platforms = new Dictionary<string, Platform>();
 
-        public Manifest(string version, string copyright, Dictionary<string, Platform> platforms, Message message) {
+        public Manifest(string version, string copyright, Dictionary<string, Platform> platforms, Message message)
+        {
             Version = version;
             Copyright = copyright;
             Platforms = platforms;
             Message = message;
         }
 
-        public Manifest() {
+        public Manifest()
+        {
 
         }
     }
 
-    public class Platform {
+    public class Platform
+    {
         public string Name = "";
         public string MenuName = "";
         public string HomeIcon = "";
@@ -85,11 +93,13 @@ namespace sdsetup_backend {
 
 
 
-        public Platform() {
+        public Platform()
+        {
 
         }
 
-        public Platform(string name, string menuName, string homeIcon, string iD, string color, bool visible, Dictionary<string, PackageSection> packageSections, List<Bundle> bundles) {
+        public Platform(string name, string menuName, string homeIcon, string iD, string color, bool visible, Dictionary<string, PackageSection> packageSections, List<Bundle> bundles)
+        {
             Name = name;
             MenuName = menuName;
             HomeIcon = homeIcon;
@@ -101,7 +111,8 @@ namespace sdsetup_backend {
         }
     }
 
-    public class PackageSection {
+    public class PackageSection
+    {
         public string ID = "";
         public string Name = "";
         public string DisplayName = "";
@@ -114,11 +125,13 @@ namespace sdsetup_backend {
 
 
 
-        public PackageSection() {
+        public PackageSection()
+        {
 
         }
 
-        public PackageSection(string iD, string name, string displayName, int listingMode, bool visible, List<string> when, int whenMode, Dictionary<string, PackageCategory> categories, string footer) {
+        public PackageSection(string iD, string name, string displayName, int listingMode, bool visible, List<string> when, int whenMode, Dictionary<string, PackageCategory> categories, string footer)
+        {
             ID = iD;
             Name = name;
             DisplayName = displayName;
@@ -131,7 +144,8 @@ namespace sdsetup_backend {
         }
     }
 
-    public class PackageCategory {
+    public class PackageCategory
+    {
         public string ID = "";
         public string Name = "";
         public string DisplayName = "";
@@ -142,11 +156,13 @@ namespace sdsetup_backend {
 
 
 
-        public PackageCategory() {
+        public PackageCategory()
+        {
 
         }
 
-        public PackageCategory(string iD, string name, string displayName, bool visible, List<string> when, int whenMode, Dictionary<string, PackageSubcategory> subcategories) {
+        public PackageCategory(string iD, string name, string displayName, bool visible, List<string> when, int whenMode, Dictionary<string, PackageSubcategory> subcategories)
+        {
             ID = iD;
             Name = name;
             DisplayName = displayName;
@@ -157,7 +173,8 @@ namespace sdsetup_backend {
         }
     }
 
-    public class PackageSubcategory {
+    public class PackageSubcategory
+    {
         public string ID = "";
         public string Name = "";
         public string DisplayName = "";
@@ -167,11 +184,13 @@ namespace sdsetup_backend {
         public Dictionary<string, Package> Packages = new Dictionary<string, Package>();
 
 
-        public PackageSubcategory() {
+        public PackageSubcategory()
+        {
 
         }
 
-        public PackageSubcategory(string iD, string name, string displayName, bool visible, List<string> when, int whenMode, Dictionary<string, Package> packages) {
+        public PackageSubcategory(string iD, string name, string displayName, bool visible, List<string> when, int whenMode, Dictionary<string, Package> packages)
+        {
             ID = iD;
             Name = name;
             DisplayName = displayName;
@@ -182,7 +201,8 @@ namespace sdsetup_backend {
         }
     }
 
-    public class Package {
+    public class Package
+    {
         public string ID = "";
         public string Name = "";
         public string DisplayName = "";
@@ -208,11 +228,13 @@ namespace sdsetup_backend {
 
 
 
-        public Package() {
+        public Package()
+        {
 
         }
 
-        public Package(string iD, string name, string displayName, string platform, string section, string category, string subcategory, string authors, Dictionary<string, string> versions, string source, string dLSource, int size, int priority, bool enabledByDefault, bool visible, bool showsInCredits, string description, List<string> when, int whenMode, Warning warning, List<string> dependencies, List<string> deleteOnUpdate) {
+        public Package(string iD, string name, string displayName, string platform, string section, string category, string subcategory, string authors, Dictionary<string, string> versions, string source, string dLSource, int size, int priority, bool enabledByDefault, bool visible, bool showsInCredits, string description, List<string> when, int whenMode, Warning warning, List<string> dependencies, List<string> deleteOnUpdate)
+        {
             ID = iD;
             Name = name;
             DisplayName = displayName;

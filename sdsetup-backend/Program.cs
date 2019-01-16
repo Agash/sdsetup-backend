@@ -1,18 +1,16 @@
-﻿using System;
+﻿using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Hosting;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using Newtonsoft.Json;
 using System.Net;
 
-namespace sdsetup_backend {
-    public class Program {
+namespace sdsetup_backend
+{
+    public class Program
+    {
 
         public static Dictionary<string, string> Manifests;
 
@@ -35,18 +33,22 @@ namespace sdsetup_backend {
         public static string latestAppVersion = "NO VERSION";
 
         private static string _privelegedUUID;
-        private static string privelegedUUID {
-            get {
+        private static string privelegedUUID
+        {
+            get
+            {
                 return _privelegedUUID;
             }
 
-            set {
+            set
+            {
                 Console.WriteLine("[WARN] New priveleged UUID: " + value);
                 _privelegedUUID = value;
             }
         }
 
-        public static void Main(string[] args) {
+        public static void Main(string[] args)
+        {
 
             ReloadEverything();
 
@@ -67,27 +69,33 @@ namespace sdsetup_backend {
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
-                .UseKestrel(options => {
+                .UseKestrel(options =>
+                {
                     options.Listen(IPAddress.Parse(ip), httpPort);
-                    options.Listen(IPAddress.Parse(ip), httpsPort, listenOptions => {
+                    options.Listen(IPAddress.Parse(ip), httpsPort, listenOptions =>
+                    {
                         listenOptions.UseHttps(httpsCertLocation, httpsCertKey);
                     });
                 })
                 .UseStartup<Startup>();
 
-        public static bool IsUuidPriveleged(string uuid) {
+        public static bool IsUuidPriveleged(string uuid)
+        {
             if (uuid == privelegedUUID) return true;
             return false;
         }
 
-        public static bool SetPrivelegedUUID(string oldUuid, string newUuid) {
+        public static bool SetPrivelegedUUID(string oldUuid, string newUuid)
+        {
             if (oldUuid != privelegedUUID) return false;
             privelegedUUID = newUuid;
             return true;
         }
 
-        public static string ReloadEverything() {
-            try {
+        public static string ReloadEverything()
+        {
+            try
+            {
                 //use temporary variables so if anything goes wrong, values wont be out of sync.
                 Dictionary<string, string> _Manifests = new Dictionary<string, string>();
 
@@ -102,7 +110,8 @@ namespace sdsetup_backend {
                 if (!File.Exists(_Config + "/latestappversion.txt")) File.WriteAllText(_Config + "/latestappversion.txt", "NO VERSION");
                 if (!File.Exists(_Config + "/validchannels.txt")) File.WriteAllLines(_Config + "/validchannels.txt", new string[] { "latest", "nightly" });
 
-                foreach(string n in Directory.EnumerateDirectories(_Files )) {
+                foreach (string n in Directory.EnumerateDirectories(_Files))
+                {
                     string k = n.Split('/').Last();
                     if (!File.Exists(_Files + "/" + k + "/manifest6.json")) File.WriteAllText(_Files + "/" + k + "/manifest6.json", "{}");
                 }
@@ -112,10 +121,12 @@ namespace sdsetup_backend {
                 string[] _validChannels = File.ReadAllLines(_Config + "/validchannels.txt");
 
                 //look away
-                foreach (string n in Directory.EnumerateDirectories(_Files)) {
+                foreach (string n in Directory.EnumerateDirectories(_Files))
+                {
                     string k = n.Split('/').Last();
                     Manifest m = JsonConvert.DeserializeObject<Manifest>(File.ReadAllText(_Files + "/" + k + "/manifest6.json"));
-                    foreach (string c in Directory.EnumerateDirectories(_Files + "/" + k)) {
+                    foreach (string c in Directory.EnumerateDirectories(_Files + "/" + k))
+                    {
                         string f = c.Split('/').Last();
                         Package p = JsonConvert.DeserializeObject<Package>(File.ReadAllText(_Files + "/" + k + "/" + f + "/info.json"));
                         m.Platforms[p.Platform].PackageSections[p.Section].Categories[p.Category].Subcategories[p.Subcategory].Packages[p.ID] = p;
@@ -123,7 +134,7 @@ namespace sdsetup_backend {
                     _Manifests[k] = JsonConvert.SerializeObject(m, Formatting.Indented);
                 }
 
-                
+
                 //update the real variables
                 Temp = _Temp;
                 Files = _Files;
@@ -133,14 +144,18 @@ namespace sdsetup_backend {
                 validChannels = _validChannels;
                 Manifests = _Manifests;
 
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 return "[ERROR] Something went wrong while reloading: \n\n\nMessage:\n   " + e.Message + "\n\nStack Trace:\n" + e.StackTrace + "\n\n\nThe server will continue running and no changes will be saved";
             }
             return "Success";
         }
 
-        public static bool OverridePrivelegedUuid() {
-            if (File.Exists(Config + "/uuidoverride.txt")) {
+        public static bool OverridePrivelegedUuid()
+        {
+            if (File.Exists(Config + "/uuidoverride.txt"))
+            {
                 privelegedUUID = File.ReadAllText(Config + "/uuidoverride.txt");
                 File.Delete(Config + "/uuidoverride.txt");
                 return true;
