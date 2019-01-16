@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 
@@ -14,99 +15,70 @@ namespace sdsetup_backend.Controllers
     {
 
         [HttpGet("fetch/zip")]
-        public ActionResult FetchZip()
+        public ActionResult FetchZip([FromHeader] FetchZipInputModel model)
         {
-            //wtf microsoft use a string array
-            Microsoft.Extensions.Primitives.StringValues _uuid;
-            Microsoft.Extensions.Primitives.StringValues _packageset;
-            Microsoft.Extensions.Primitives.StringValues _channel;
-            Microsoft.Extensions.Primitives.StringValues _packages;
-            Microsoft.Extensions.Primitives.StringValues _client;
+            if (!ModelState.IsValid)
+                return StatusCode(400, "Invalid input");
+            
+            if (Program.uuidLocks.Contains(model.UUID))
+                return StatusCode(400, "UUID " + model.UUID + " locked");
 
-            if (!Request.Headers.TryGetValue("SDSETUP-UUID", out _uuid)) return new StatusCodeResult(400);
-            if (!Request.Headers.TryGetValue("SDSETUP-PACKAGESET", out _packageset)) return new StatusCodeResult(400);
-            if (!Request.Headers.TryGetValue("SDSETUP-CHANNEL", out _channel)) return new StatusCodeResult(400);
-            if (!Request.Headers.TryGetValue("SDSETUP-PACKAGES", out _packages)) return new StatusCodeResult(400);
-            Request.Headers.TryGetValue("SDSETUP-CLIENT", out _client); // optional, currently only used by homebrew app to specify it only wants SD folder
+            if (!Program.validChannels.Contains(model.Channel))
+                return StatusCode(400, "Invalid channel");
 
+            if (!Directory.Exists(Program.Files + "/" + model.PackageSet))
+                return StatusCode(400, "Invalid packageset");
 
-            string uuid = _uuid[0];
-            string packageset = _packageset[0];
-            string channel = _channel[0];
-            string packages = _packages[0];
-            string client = null;
-            if (_client.Count > 0 && !String.IsNullOrWhiteSpace(_client[0]))
-            {
-                client = _client[0];
-            }
+            if (System.IO.File.Exists(Program.Files + "/" + model.PackageSet + "/.PRIVILEGED.FLAG") && !Program.IsUuidPriveleged(model.UUID))
+                return StatusCode(401, "You do not have access to that packageset");
 
+            string tempdir = Program.Temp + "/" + model.UUID;
+            try
+            {
+                Program.uuidLocks.Add(model.UUID);
 
-            if (Program.uuidLocks.Contains(uuid))
-            {
-                return new ObjectResult("UUID " + uuid + " locked");
-            }
-            else if (!Program.validChannels.Contains(channel))
-            {
-                return new ObjectResult("Invalid channel");
-            }
-            else if (!Directory.Exists(Program.Files + "/" + packageset))
-            {
-                return new ObjectResult("Invalid packageset");
-            }
-            else if (System.IO.File.Exists(Program.Files + "/" + packageset + "/.PRIVILEGED.FLAG") && !Program.IsUuidPriveleged(uuid))
-            {
-                return new ObjectResult("You do not have access to that packageset");
-            }
-            else
-            {
-                string tempdir = Program.Temp + "/" + uuid;
-                try
+                string[] requestedPackages = model.Packages.Split(';');
+                List<KeyValuePair<string, string>> files = new List<KeyValuePair<string, string>>();
+                foreach (string k in requestedPackages)
                 {
-                    Program.uuidLocks.Add(uuid);
-
-                    string[] requestedPackages = packages.Split(';');
-                    List<KeyValuePair<string, string>> files = new List<KeyValuePair<string, string>>();
-                    foreach (string k in requestedPackages)
+                    //sanitize input
+                    if (k.Contains("/") || k.Contains("/") || k.Contains("..") || k.Contains("~") || k.Contains("%"))
                     {
-                        //sanitize input
-                        if (k.Contains("/") || k.Contains("/") || k.Contains("..") || k.Contains("~") || k.Contains("%"))
-                        {
-                            Program.uuidLocks.Remove(uuid);
-                            return new ObjectResult("hackerman");
-                        }
+                        Program.uuidLocks.Remove(model.UUID);
+                        return StatusCode(400, "hackerman");
+                    }
 
-                        if (Directory.Exists(Program.Files + "/" + packageset + "/" + k + "/" + channel))
+                    if (Directory.Exists(Program.Files + "/" + model.PackageSet + "/" + k + "/" + model.Channel))
+                    {
+                        foreach (string f in EnumerateAllFiles(Program.Files + "/" + model.PackageSet + "/" + k + "/" + model.Channel))
                         {
-                            foreach (string f in EnumerateAllFiles(Program.Files + "/" + packageset + "/" + k + "/" + channel))
+                            if (model.Client == "hbswitch")
                             {
-                                if (client == "hbswitch")
+                                if (f.StartsWith(Program.Files + "/" + model.PackageSet + "/" + k + "/" + model.Channel + "/sd"))
                                 {
-                                    if (f.StartsWith(Program.Files + "/" + packageset + "/" + k + "/" + channel + "/sd"))
-                                    {
-                                        files.Add(new KeyValuePair<string, string>(f.Replace(Program.Files + "/" + packageset + "/" + k + "/" + channel + "/sd", ""), f));
-                                    }
+                                    files.Add(new KeyValuePair<string, string>(f.Replace(Program.Files + "/" + model.PackageSet + "/" + k + "/" + model.Channel + "/sd", ""), f));
                                 }
-                                else
-                                {
-                                    files.Add(new KeyValuePair<string, string>(f.Replace(Program.Files + "/" + packageset + "/" + k + "/" + channel, ""), f));
-                                }
+                            }
+                            else
+                            {
+                                files.Add(new KeyValuePair<string, string>(f.Replace(Program.Files + "/" + model.PackageSet + "/" + k + "/" + model.Channel, ""), f));
                             }
                         }
                     }
-
-                    DeletingFileStream stream = (DeletingFileStream)ZipFromFilestreams(files.ToArray(), uuid);
-
-                    Program.generatedZips[uuid] = stream;
-                    stream.Timeout(30000);
-
-                    Program.uuidLocks.Remove(uuid);
-                    return new ObjectResult("READY");
                 }
-                catch (Exception)
-                {
-                    Program.uuidLocks.Remove(uuid);
-                    return new ObjectResult("Internal server error occurred");
-                }
+
+                DeletingFileStream stream = (DeletingFileStream)ZipFromFilestreams(files.ToArray(), model.UUID);
+
+                Program.generatedZips[model.UUID] = stream;
+                stream.Timeout(30000);
+
+                Program.uuidLocks.Remove(model.UUID);
+                return Ok("READY");
+            }
+            catch (Exception)
+            {
+                Program.uuidLocks.Remove(model.UUID);
+                return StatusCode(500, "Internal server error occurred");
             }
 
         }
@@ -124,7 +96,8 @@ namespace sdsetup_backend.Controllers
                     Program.generatedZips.Remove(uuid);
                     if (stream == null)
                     {
-                        return new ObjectResult("Expired");
+                        //StatusCode 410 Gone: The requested resource is no longer available at the server and no forwarding address is known. This condition is expected to be considered permanent (since UUID..).
+                        return StatusCode(410, "Expired");
                     }
                     string zipname = ("SDSetup(" + DateTime.Now.ToShortDateString() + ").zip").Replace("-", ".").Replace("_", ".");
                     Response.Headers["Content-Disposition"] = "filename=" + zipname;
@@ -132,13 +105,13 @@ namespace sdsetup_backend.Controllers
                 }
                 else
                 {
-                    return new ObjectResult("Expired");
+                    return StatusCode(410, "Expired");
                 }
             }
             catch (Exception)
             {
                 Program.generatedZips[uuid] = null;
-                return new ObjectResult("Expired");
+                return StatusCode(410, "Expired");
             }
 
         }
@@ -148,26 +121,26 @@ namespace sdsetup_backend.Controllers
         {
             if (!Directory.Exists(Program.Files + "/" + packageset))
             {
-                return new ObjectResult(packageset);
+                return Ok(packageset);
             }
             else if (System.IO.File.Exists(Program.Files + "/" + packageset + "/.PRIVILEGED.FLAG") && !Program.IsUuidPriveleged(uuid))
             {
-                return new ObjectResult("You do not have access to that packageset");
+                return StatusCode(401, "You do not have access to that packageset");
             }
 
-            return new ObjectResult(Program.Manifests[packageset]);
+            return Ok(Program.Manifests[packageset]);
         }
 
         [HttpGet("get/latestpackageset")]
         public ActionResult GetLatestPackageset()
         {
-            return new ObjectResult(Program.latestPackageset);
+            return Ok(Program.latestPackageset);
         }
 
         [HttpGet("get/latestappversion/switch")]
         public ActionResult GetLatestAppVersion()
         {
-            return new ObjectResult(Program.latestAppVersion);
+            return Ok(Program.latestAppVersion);
         }
 
         [HttpGet("get/latestappdownload/switch")]
@@ -181,39 +154,47 @@ namespace sdsetup_backend.Controllers
         [HttpGet("set/latestpackageset/{uuid}/{packageset}")]
         public ActionResult SetLatestPackageset(string uuid, string packageset)
         {
-            if (!Program.IsUuidPriveleged(uuid)) return new ObjectResult("UUID not priveleged");
+            if (!Program.IsUuidPriveleged(uuid))
+                return StatusCode(401, "UUID not priveleged");
+
             Program.latestPackageset = packageset;
-            return new ObjectResult("Success");
+            return Ok("Success");
         }
 
         [HttpGet("admin/reloadall/{uuid}")]
         public ActionResult ReloadEverything(string uuid)
         {
-            if (!Program.IsUuidPriveleged(uuid)) return new ObjectResult("UUID not priveleged");
-            return new ObjectResult(Program.ReloadEverything());
+            if (!Program.IsUuidPriveleged(uuid))
+                return StatusCode(401, "UUID not priveleged");
+
+            return Ok(Program.ReloadEverything());
         }
 
         [HttpGet("admin/overrideprivelegeduuid/")]
         public ActionResult OverridePrivelegedUuid(string uuid)
         {
-            if (Program.OverridePrivelegedUuid()) return new ObjectResult("Success");
-            return new ObjectResult("Failed");
+            if (Program.OverridePrivelegedUuid())
+                return Ok("Success");
+
+            return StatusCode(400, "Failed");
         }
 
         [HttpGet("admin/checkuuidstatus/{uuid}")]
         public ActionResult CheckUuidStatus(string uuid)
         {
-            if (Program.IsUuidPriveleged(uuid)) return new ObjectResult("UUID is priveleged");
-            return new ObjectResult("UUID not priveleged");
+            if (Program.IsUuidPriveleged(uuid))
+                return Ok("UUID is priveleged");
+
+            return StatusCode(401, "UUID not priveleged");
         }
 
         [HttpGet("admin/setprivelegeduuid/{oldUuid}/{newUuid}")]
         public ActionResult SetPrivelegedUuid(string oldUuid, string newUuid)
         {
+            if (Program.SetPrivelegedUUID(oldUuid, newUuid))
+                return Ok("Success");
 
-            if (Program.SetPrivelegedUUID(oldUuid, newUuid)) return new ObjectResult("Success");
-            else return new ObjectResult("Old UUID invalid");
-
+            return StatusCode(400, "Old UUID invalid");
         }
 
 
@@ -288,6 +269,28 @@ namespace sdsetup_backend.Controllers
                     DirectoryCopy(subdir.FullName, temppath, copySubDirs, overwriteFiles);
                 }
             }
+        }
+
+        public class FetchZipInputModel
+        {
+            [FromHeader(Name = "SDSETUP-UUID")]
+            [Required]
+            public string UUID { get; set; }
+
+            [FromHeader(Name = "SDSETUP-PACKAGESET")]
+            [Required]
+            public string PackageSet { get; set; }
+
+            [FromHeader(Name = "SDSETUP-CHANNEL")]
+            [Required]
+            public string Channel { get; set; }
+
+            [FromHeader(Name = "SDSETUP-PACKAGES")]
+            [Required]
+            public string Packages { get; set; }
+
+            [FromHeader(Name = "SDSETUP-CLIENT")]
+            public string Client { get; set; }
         }
     }
 }
